@@ -1,0 +1,8 @@
+# 我的邻居波杰克 —— 运行依赖
+# Streamlit Community Cloud 会自动读取本文件并安装；本地可用：
+#   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+# 网页界面
+streamlit==1.66.1
+# 调用 DeepSeek 的 OpenAI 兼容接口
+openai==3.41.0
