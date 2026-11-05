@@ -8,17 +8,25 @@
 运行：streamlit run app_web.py
 """
 
+import inspect
 import os
 
 import streamlit as st
 
-from app import (
-    API_KEY_ENV,
-    SETUP_HINT,
-    SYSTEM_PROMPT,
-    api_key_problems,
-    generate_text,
-)
+# app.py 是共用主代码：如果部署时只更新了网页文件、没同步 app.py，
+# 这里会 import 失败或签名对不上。先兜住，别让用户对着 TypeError 猜。
+try:
+    from app import (
+        API_KEY_ENV,
+        SETUP_HINT,
+        SYSTEM_PROMPT,
+        api_key_problems,
+        generate_text,
+    )
+    _import_error = None
+except ImportError as _e:  # 例如旧版 app.py 里没有 SETUP_HINT
+    _import_error = _e
+    API_KEY_ENV = "DEEPSEEK_API_KEY"
 
 # 送给模型的上下文上限（消息条数，1 轮 ≈ 2 条）。设成 None 表示全部发送。
 MAX_HISTORY_MESSAGES = 20
@@ -29,6 +37,43 @@ st.set_page_config(
     page_icon="🐴",
     layout="centered",
 )
+
+# ---------------------------------------------------------------- 版本自检
+_STALE_HINT = (
+    "说明当前运行的是**旧版 `app.py`**：网页代码已经更新，但主代码文件没同步。\n\n"
+    "分两种情况：\n"
+    "- **本地运行**：确认 `app.py` 与 `app_web.py` 是同一批文件，然后**彻底重启** Streamlit"
+    "（`Ctrl+C` 后重新执行命令）。只点页面上的 Rerun 不会重新加载已导入的 `app` 模块。\n"
+    "- **部署在 Streamlit Cloud**：把新版 `app.py` 一起提交并推送，云端会自动重新部署。\n\n"
+    "正确版本的 `generate_text` 签名应为：\n"
+)
+
+
+def _accepts_system_prompt(fn):
+    """generate_text 是否接受 system_prompt（或接受 **kwargs）。"""
+    try:
+        params = inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        return True  # 拿不到签名就不拦，交给运行时
+    return "system_prompt" in params or any(
+        p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
+    )
+
+
+if _import_error is not None:
+    st.error(f"❌ `app_web.py` 与 `app.py` 版本不一致，导入失败：{_import_error}")
+    st.markdown(_STALE_HINT)
+    st.code("def generate_text(prompt, history, system_prompt=SYSTEM_PROMPT, temperature=1.0):")
+    st.stop()
+
+if not _accepts_system_prompt(generate_text):
+    st.error(
+        "❌ 版本不一致：`generate_text()` 不接受 `system_prompt` 参数，"
+        "所以角色切换时调用会报 TypeError。"
+    )
+    st.markdown(_STALE_HINT)
+    st.code("def generate_text(prompt, history, system_prompt=SYSTEM_PROMPT, temperature=1.0):")
+    st.stop()
 
 
 # ---------------------------------------------------------------- Key 来源

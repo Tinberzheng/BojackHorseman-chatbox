@@ -150,19 +150,23 @@ SYSTEM_PROMPT = """你现在扮演《马男波杰克》(BoJack Horseman) 的主�
 
 
 # 3. 定义一个生成文本的函数
-def build_messages(prompt, history):
-    """拼装请求：固定的人格 + 最近的对话上下文 + 本次输入。"""
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+def build_messages(prompt, history, system_prompt=SYSTEM_PROMPT):
+    """拼装请求：人格设定（system）+ 对话上下文 + 本次输入。
+
+    system_prompt 默认是波杰克人格；网页版切换角色时由调用方传入对应设定，
+    始终放在 messages 的最前面。
+    """
+    messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)
     messages.append({"role": "user", "content": prompt})
     return messages
 
 
-def generate_text(prompt, history):
+def generate_text(prompt, history, system_prompt=SYSTEM_PROMPT, temperature=1.0):
     response = get_client().chat.completions.create(
         model=MODEL,
-        messages=build_messages(prompt, history),
-        temperature=1.0,  # 温度调高一点，语气更放得开
+        messages=build_messages(prompt, history, system_prompt),
+        temperature=temperature,  # 波杰克 1.0 放得开；严谨角色由调用方调低
         top_p=0.95,
         presence_penalty=0.4,  # 压一压重复句式，避免每句都是同一套嘲讽
         frequency_penalty=0.3,
